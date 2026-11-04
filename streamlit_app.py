@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import datetime
+from streamlit_gsheets import GSheetsConnection
 
 # Configuração da Página
 st.set_page_config(
@@ -10,68 +11,28 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# AUTENTICAÇÃO E BASE DE DADOS EM MEMÓRIA
+# CONEXÃO COM O GOOGLE SHEETS
+# ---------------------------------------------------------
+try:
+    conn = st.connection("gsheets", type=GSheetsConnection)
+except Exception as e:
+    st.error("⚠️ Conexão com a planilha em configuração. Verifique os Secrets.")
+
+# Função auxiliar para ler abas com segurança
+def carregar_aba(nome_aba, colunas_padrao):
+    try:
+        df = conn.read(worksheet=nome_aba, ttl=0)
+        if df.empty:
+            return pd.DataFrame(columns=colunas_padrao)
+        return df
+    except Exception:
+        return pd.DataFrame(columns=colunas_padrao)
+
+# ---------------------------------------------------------
+# AUTENTICAÇÃO DE GESTOR
 # ---------------------------------------------------------
 if "admin_logado" not in st.session_state:
     st.session_state.admin_logado = False
-
-# 1. ESPAÇOS ESPORTIVOS
-if "espacos" not in st.session_state:
-    st.session_state.espacos = pd.DataFrame([
-        {"Nome": "Ginásio Alcides Pan", "Tipo": "Ginásio Poliesportivo", "Bairro": "Vila Industrial", "Condição": "Boa", "Última Vistoria": "2026-10-15", "Acessível": "Sim"},
-        {"Nome": "Complexo Hugo Zeni", "Tipo": "Complexo / Piscina", "Bairro": "Jardim La Salle", "Condição": "Boa", "Última Vistoria": "2026-09-20", "Acessível": "Sim"},
-        {"Nome": "Campo Vila Panorama", "Tipo": "Campo de Futebol", "Bairro": "Vila Panorama", "Condição": "Regular", "Última Vistoria": "2026-10-01", "Acessível": "Parcial"}
-    ])
-
-# 2. TURMAS
-if "turmas" not in st.session_state:
-    st.session_state.turmas = pd.DataFrame([
-        {"Código": "TUR-001", "Modalidade": "Futebol de Campo", "Núcleo": "Vila Panorama", "Horário": "Seg/Qua 08:30", "Professor": "Prof. Carlos Silva", "Alunos": 30},
-        {"Código": "TUR-002", "Modalidade": "Futsal Sub-13", "Núcleo": "Alcides Pan", "Horário": "Ter/Qui 14:00", "Professor": "Profa. Amanda Lima", "Alunos": 28},
-        {"Código": "TUR-003", "Modalidade": "Voleibol Feminino", "Núcleo": "Hugo Zeni", "Horário": "Seg/Qua 16:00", "Professor": "Prof. Roberto Nunes", "Alunos": 25}
-    ])
-
-# 3. AGENDA
-if "agenda" not in st.session_state:
-    st.session_state.agenda = pd.DataFrame([
-        {"Data": "2026-11-10", "Evento": "Abertura dos Jogos Escolares de Toledo", "Local": "Ginásio Alcides Pan", "Responsável": "SMEL Toledo"},
-        {"Data": "2026-11-15", "Evento": "Torneio Comunitário de Futsal", "Local": "Quadra Vila Panorama", "Responsável": "Associação de Bairro"}
-    ])
-
-# 4. EQUIPE
-if "equipe" not in st.session_state:
-    st.session_state.equipe = pd.DataFrame([
-        {"Nome": "Carlos Silva", "Cargo": "Prof. Educação Física", "Núcleo": "Vila Panorama", "Carga Horária": "40h/sem"},
-        {"Nome": "Amanda Lima", "Cargo": "Profª Educação Física", "Núcleo": "Ginásio Alcides Pan", "Carga Horária": "40h/sem"}
-    ])
-
-# 5. ENTIDADES
-if "entidades" not in st.session_state:
-    st.session_state.entidades = pd.DataFrame([
-        {"Entidade": "Associação de Moradores da Vila Panorama", "CNPJ": "01.234.567/0001-89", "Presidente": "João Pedroso", "Status": "Regular"},
-        {"Entidade": "Liga de Futebol Amador de Toledo", "CNPJ": "02.345.678/0001-90", "Presidente": "Sérgio Mendes", "Status": "Regular"}
-    ])
-
-# 6. PROJETOS
-if "projetos" not in st.session_state:
-    st.session_state.projetos = pd.DataFrame([
-        {"Projeto": "Movimenta Territórios Toledo", "Orçamento": "R$ 96.000,00", "Beneficiários": 240, "Execução": "75%"},
-        {"Projeto": "Atleta do Futuro", "Orçamento": "R$ 150.000,00", "Beneficiários": 450, "Execução": "60%"}
-    ])
-
-# 7. FUNDO MUNICIPAL
-if "fundo" not in st.session_state:
-    st.session_state.fundo = pd.DataFrame([
-        {"Item": "Material Esportivo / Bolas", "Valor": 45000.0, "Fonte": "FME Próprio", "Status": "Pago"},
-        {"Item": "Manutenção de Quadras e LED", "Valor": 120000.0, "Fonte": "Emenda Parlamentar", "Status": "Em Execução"}
-    ])
-
-# 8. NOTÍCIAS E PUBLICAÇÕES
-if "publicacoes" not in st.session_state:
-    st.session_state.publicacoes = [
-        {"Data": "2026-10-28", "Título": "Inscrições Abertas - Jogos Escolares", "Categoria": "Edital / Evento", "Conteúdo": "Inscrições abertas para a fase municipal até 15/11."},
-        {"Data": "2026-10-20", "Título": "Reforma do Campo da Vila Panorama", "Categoria": "Obras", "Conteúdo": "Início da iluminação em LED e revitalização do gramado."}
-    ]
 
 # ---------------------------------------------------------
 # BARRA LATERAL - NAVEGAÇÃO E LOGIN
@@ -92,7 +53,7 @@ if not st.session_state.admin_logado:
         else:
             st.sidebar.error("❌ Senha incorreta.")
 else:
-    st.sidebar.success("🟢 Modo Gestão Ativo")
+    st.sidebar.success("🟢 Modo Gestão Ativo (Gravação em Google Sheets)")
     if st.sidebar.button("Sair do Modo Gestão"):
         st.session_state.admin_logado = False
         st.rerun()
@@ -119,13 +80,18 @@ menu = st.sidebar.radio(
 # ---------------------------------------------------------
 if menu == "📊 Painel Executivo":
     st.title("📊 Painel Executivo — SMEL Toledo")
-    st.caption("Resumo dinâmico da gestão municipal do esporte")
+    st.caption("Resumo dinâmico da gestão municipal do esporte (Dados do Google Sheets)")
     
-    total_alunos = int(st.session_state.turmas["Alunos"].sum()) if not st.session_state.turmas.empty else 0
-    total_turmas = len(st.session_state.turmas)
-    total_espacos = len(st.session_state.espacos)
-    total_fundo = float(st.session_state.fundo["Valor"].sum()) if not st.session_state.fundo.empty else 0.0
-    
+    df_turmas = carregar_aba("turmas", ["Código", "Modalidade", "Núcleo", "Horário", "Professor", "Alunos"])
+    df_espacos = carregar_aba("espacos", ["Nome", "Tipo", "Bairro", "Condição", "Última Vistoria", "Acessível"])
+    df_fundo = carregar_aba("fundo", ["Item", "Valor", "Fonte", "Status"])
+    df_projetos = carregar_aba("projetos", ["Projeto", "Orçamento", "Beneficiários", "Execução"])
+
+    total_alunos = int(pd.to_numeric(df_turmas["Alunos"], errors='coerce').sum()) if not df_turmas.empty else 0
+    total_turmas = len(df_turmas)
+    total_espacos = len(df_espacos)
+    total_fundo = float(pd.to_numeric(df_fundo["Valor"], errors='coerce').sum()) if not df_fundo.empty else 0.0
+
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total de Alunos", f"{total_alunos} Atendidos")
     col2.metric("Turmas Ativas", f"{total_turmas} Turmas")
@@ -134,14 +100,15 @@ if menu == "📊 Painel Executivo":
     
     st.divider()
     st.subheader("📌 Resumo dos Projetos Ativos")
-    st.dataframe(st.session_state.projetos, use_container_width=True)
+    st.dataframe(df_projetos, use_container_width=True)
 
 # ---------------------------------------------------------
 # 2. TURMAS & ESCOLINHAS
 # ---------------------------------------------------------
 elif menu == "📋 Turmas & Escolinhas":
     st.title("📋 Turmas e Escolinhas Esportivas")
-    st.dataframe(st.session_state.turmas, use_container_width=True)
+    df_turmas = carregar_aba("turmas", ["Código", "Modalidade", "Núcleo", "Horário", "Professor", "Alunos"])
+    st.dataframe(df_turmas, use_container_width=True)
     
     if st.session_state.admin_logado:
         st.divider()
@@ -157,10 +124,11 @@ elif menu == "📋 Turmas & Escolinhas":
             prof = col5.text_input("Professor Responsável:")
             qtd = col6.number_input("Nº de Alunos Vagas:", min_value=1, value=30)
             
-            if st.form_submit_button("💾 Cadastrar Turma"):
+            if st.form_submit_button("💾 Salvar na Planilha"):
                 nova = pd.DataFrame([{"Código": cod, "Modalidade": mod, "Núcleo": nuc, "Horário": hor, "Professor": prof, "Alunos": qtd}])
-                st.session_state.turmas = pd.concat([st.session_state.turmas, nova], ignore_index=True)
-                st.success("✅ Turma cadastrada!")
+                df_atual = pd.concat([df_turmas, nova], ignore_index=True)
+                conn.update(worksheet="turmas", data=df_atual)
+                st.success("✅ Turma salva com sucesso no Google Sheets!")
                 st.rerun()
 
 # ---------------------------------------------------------
@@ -168,7 +136,8 @@ elif menu == "📋 Turmas & Escolinhas":
 # ---------------------------------------------------------
 elif menu == "📅 Agenda & Calendário":
     st.title("📅 Agenda & Calendário Esportivo")
-    st.dataframe(st.session_state.agenda, use_container_width=True)
+    df_agenda = carregar_aba("agenda", ["Data", "Evento", "Local", "Responsável"])
+    st.dataframe(df_agenda, use_container_width=True)
     
     if st.session_state.admin_logado:
         st.divider()
@@ -181,7 +150,8 @@ elif menu == "📅 Agenda & Calendário":
             
             if st.form_submit_button("💾 Incluir na Agenda Pública"):
                 nova_ag = pd.DataFrame([{"Data": str(d_evt), "Evento": n_evt, "Local": l_evt, "Responsável": r_evt}])
-                st.session_state.agenda = pd.concat([st.session_state.agenda, nova_ag], ignore_index=True)
+                df_atual = pd.concat([df_agenda, nova_ag], ignore_index=True)
+                conn.update(worksheet="agenda", data=df_atual)
                 st.success("✅ Evento adicionado à agenda!")
                 st.rerun()
 
@@ -190,7 +160,8 @@ elif menu == "📅 Agenda & Calendário":
 # ---------------------------------------------------------
 elif menu == "🏟️ Espaços Esportivos":
     st.title("🏟️ Espaços Esportivos Municipais")
-    st.dataframe(st.session_state.espacos, use_container_width=True)
+    df_espacos = carregar_aba("espacos", ["Nome", "Tipo", "Bairro", "Condição", "Última Vistoria", "Acessível"])
+    st.dataframe(df_espacos, use_container_width=True)
     
     if st.session_state.admin_logado:
         st.divider()
@@ -206,8 +177,9 @@ elif menu == "🏟️ Espaços Esportivos":
             
             if st.form_submit_button("💾 Cadastrar Espaço"):
                 novo_e = pd.DataFrame([{"Nome": n_esp, "Tipo": t_esp, "Bairro": b_esp, "Condição": c_esp, "Última Vistoria": str(v_esp), "Acessível": a_esp}])
-                st.session_state.espacos = pd.concat([st.session_state.espacos, novo_e], ignore_index=True)
-                st.success("✅ Espaço cadastrado com sucesso!")
+                df_atual = pd.concat([df_espacos, novo_e], ignore_index=True)
+                conn.update(worksheet="espacos", data=df_atual)
+                st.success("✅ Espaço cadastrado no Google Sheets!")
                 st.rerun()
 
 # ---------------------------------------------------------
@@ -215,7 +187,8 @@ elif menu == "🏟️ Espaços Esportivos":
 # ---------------------------------------------------------
 elif menu == "👥 Equipe & Professores":
     st.title("👥 Quadro de Servidores e Professores")
-    st.dataframe(st.session_state.equipe, use_container_width=True)
+    df_equipe = carregar_aba("equipe", ["Nome", "Cargo", "Núcleo", "Carga Horária"])
+    st.dataframe(df_equipe, use_container_width=True)
     
     if st.session_state.admin_logado:
         st.divider()
@@ -228,7 +201,8 @@ elif menu == "👥 Equipe & Professores":
             
             if st.form_submit_button("💾 Salvar Servidor"):
                 novo_p = pd.DataFrame([{"Nome": n_prof, "Cargo": c_prof, "Núcleo": nuc_prof, "Carga Horária": ch_prof}])
-                st.session_state.equipe = pd.concat([st.session_state.equipe, novo_p], ignore_index=True)
+                df_atual = pd.concat([df_equipe, novo_p], ignore_index=True)
+                conn.update(worksheet="equipe", data=df_atual)
                 st.success("✅ Servidor cadastrado!")
                 st.rerun()
 
@@ -237,7 +211,8 @@ elif menu == "👥 Equipe & Professores":
 # ---------------------------------------------------------
 elif menu == "🏢 Entidades & Associações":
     st.title("🏢 Entidades e Ligas Esportivas Parceiras")
-    st.dataframe(st.session_state.entidades, use_container_width=True)
+    df_entidades = carregar_aba("entidades", ["Entidade", "CNPJ", "Presidente", "Status"])
+    st.dataframe(df_entidades, use_container_width=True)
     
     if st.session_state.admin_logado:
         st.divider()
@@ -250,7 +225,8 @@ elif menu == "🏢 Entidades & Associações":
             
             if st.form_submit_button("💾 Registrar Entidade"):
                 nova_ent = pd.DataFrame([{"Entidade": ent_nome, "CNPJ": ent_cnpj, "Presidente": ent_pres, "Status": ent_stat}])
-                st.session_state.entidades = pd.concat([st.session_state.entidades, nova_ent], ignore_index=True)
+                df_atual = pd.concat([df_entidades, nova_ent], ignore_index=True)
+                conn.update(worksheet="entidades", data=df_atual)
                 st.success("✅ Entidade registrada!")
                 st.rerun()
 
@@ -259,7 +235,8 @@ elif menu == "🏢 Entidades & Associações":
 # ---------------------------------------------------------
 elif menu == "🚀 Projetos & Programas":
     st.title("🚀 Projetos Estratégicos do Esporte")
-    st.dataframe(st.session_state.projetos, use_container_width=True)
+    df_projetos = carregar_aba("projetos", ["Projeto", "Orçamento", "Beneficiários", "Execução"])
+    st.dataframe(df_projetos, use_container_width=True)
     
     if st.session_state.admin_logado:
         st.divider()
@@ -272,7 +249,8 @@ elif menu == "🚀 Projetos & Programas":
             
             if st.form_submit_button("💾 Salvar Projeto"):
                 novo_proj = pd.DataFrame([{"Projeto": p_nome, "Orçamento": p_orc, "Beneficiários": p_ben, "Execução": p_exe}])
-                st.session_state.projetos = pd.concat([st.session_state.projetos, novo_proj], ignore_index=True)
+                df_atual = pd.concat([df_projetos, novo_proj], ignore_index=True)
+                conn.update(worksheet="projetos", data=df_atual)
                 st.success("✅ Projeto adicionado!")
                 st.rerun()
 
@@ -281,7 +259,8 @@ elif menu == "🚀 Projetos & Programas":
 # ---------------------------------------------------------
 elif menu == "💰 Fundo Municipal do Esporte":
     st.title("💰 Lançamentos do Fundo Municipal (FME)")
-    st.dataframe(st.session_state.fundo, use_container_width=True)
+    df_fundo = carregar_aba("fundo", ["Item", "Valor", "Fonte", "Status"])
+    st.dataframe(df_fundo, use_container_width=True)
     
     if st.session_state.admin_logado:
         st.divider()
@@ -294,7 +273,8 @@ elif menu == "💰 Fundo Municipal do Esporte":
             
             if st.form_submit_button("💾 Lançar no Fundo"):
                 novo_f = pd.DataFrame([{"Item": f_item, "Valor": f_val, "Fonte": f_fon, "Status": f_st}])
-                st.session_state.fundo = pd.concat([st.session_state.fundo, novo_f], ignore_index=True)
+                df_atual = pd.concat([df_fundo, novo_f], ignore_index=True)
+                conn.update(worksheet="fundo", data=df_atual)
                 st.success("✅ Lançamento financeiro registrado!")
                 st.rerun()
 
@@ -303,22 +283,26 @@ elif menu == "💰 Fundo Municipal do Esporte":
 # ---------------------------------------------------------
 elif menu == "📢 Portal da Transparência & Notícias":
     st.title("📢 Portal da Transparência & Notícias")
+    df_noticias = carregar_aba("publicacoes", ["Data", "Título", "Categoria", "Conteúdo"])
     
     if st.session_state.admin_logado:
-        st.subheader("➕ Nova Publicação Oficial (Direto na Tela)")
+        st.subheader("➕ Nova Publicação Oficial")
         with st.form("form_noticia", clear_on_submit=True):
             tit = st.text_input("Título:")
             cat = st.selectbox("Categoria:", ["Edital / Evento", "Notícia", "Obras", "Aviso"])
             cont = st.text_area("Conteúdo da Mensagem:")
             
             if st.form_submit_button("🚀 Publicar no Portal"):
-                st.session_state.publicacoes.insert(0, {"Data": str(datetime.date.today()), "Título": tit, "Categoria": cat, "Conteúdo": cont})
-                st.success("✅ Notícia publicada no portal público!")
+                nova_pub = pd.DataFrame([{"Data": str(datetime.date.today()), "Título": tit, "Categoria": cat, "Conteúdo": cont}])
+                df_atual = pd.concat([nova_pub, df_noticias], ignore_index=True)
+                conn.update(worksheet="publicacoes", data=df_atual)
+                st.success("✅ Notícia publicada e salva na planilha!")
                 st.rerun()
         st.divider()
         
     st.subheader("📰 Publicações Ativas para a Sociedade")
-    for item in st.session_state.publicacoes:
-        expander_label = f"📌 [{item['Data']}] {item['Título']} ({item['Categoria']})"
-        with st.expander(expander_label):
-            st.write(item["Conteúdo"])
+    if not df_noticias.empty:
+        for _, item in df_noticias.iterrows():
+            expander_label = f"📌 [{item['Data']}] {item['Título']} ({item['Categoria']})"
+            with st.expander(expander_label):
+                st.write(item["Conteúdo"])
