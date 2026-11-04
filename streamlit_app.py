@@ -1,7 +1,30 @@
 import streamlit as st
 import pandas as pd
 import datetime
+import requests
 from streamlit_gsheets import GSheetsConnection
+
+# ---------------------------------------------------------
+# CONFIGURAÇÃO DO APPS SCRIPT (GRAVAÇÃO DIRETA)
+# ---------------------------------------------------------
+URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbzso112s24zmUDyHAZFGlm8BNIBp2p-_PmYbbmtkdSKhMD3OCer3A3NxvOrPvyEg492/exec"
+
+def salvar_no_google_sheets(nome_aba, lista_valores):
+    """Envia os dados via POST para o Google Apps Script gravar na planilha."""
+    try:
+        payload = {
+            "aba": nome_aba,
+            "linha": lista_valores
+        }
+        res = requests.post(URL_APPS_SCRIPT, json=payload)
+        if res.status_code == 200:
+            return True
+        else:
+            st.error(f"⚠️ Erro ao gravar (Status {res.status_code})")
+            return False
+    except Exception as e:
+        st.error(f"⚠️ Falha na conexão: {e}")
+        return False
 
 # Configuração da Página
 st.set_page_config(
@@ -11,14 +34,13 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# CONEXÃO COM O GOOGLE SHEETS
+# CONEXÃO LEITURA COM O GOOGLE SHEETS
 # ---------------------------------------------------------
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
-except Exception as e:
-    st.error("⚠️ Conexão com a planilha em configuração. Verifique os Secrets.")
+except Exception:
+    st.error("⚠️ Verifique a configuração de leitura nos Secrets.")
 
-# Função auxiliar para ler abas com segurança
 def carregar_aba(nome_aba, colunas_padrao):
     try:
         df = conn.read(worksheet=nome_aba, ttl=0)
@@ -53,7 +75,7 @@ if not st.session_state.admin_logado:
         else:
             st.sidebar.error("❌ Senha incorreta.")
 else:
-    st.sidebar.success("🟢 Modo Gestão Ativo (Gravação em Google Sheets)")
+    st.sidebar.success("🟢 Modo Gestão Ativo")
     if st.sidebar.button("Sair do Modo Gestão"):
         st.session_state.admin_logado = False
         st.rerun()
@@ -80,7 +102,7 @@ menu = st.sidebar.radio(
 # ---------------------------------------------------------
 if menu == "📊 Painel Executivo":
     st.title("📊 Painel Executivo — SMEL Toledo")
-    st.caption("Resumo dinâmico da gestão municipal do esporte (Dados do Google Sheets)")
+    st.caption("Resumo dinâmico da gestão municipal do esporte")
     
     df_turmas = carregar_aba("turmas", ["Código", "Modalidade", "Núcleo", "Horário", "Professor", "Alunos"])
     df_espacos = carregar_aba("espacos", ["Nome", "Tipo", "Bairro", "Condição", "Última Vistoria", "Acessível"])
@@ -125,11 +147,9 @@ elif menu == "📋 Turmas & Escolinhas":
             qtd = col6.number_input("Nº de Alunos Vagas:", min_value=1, value=30)
             
             if st.form_submit_button("💾 Salvar na Planilha"):
-                nova = pd.DataFrame([{"Código": cod, "Modalidade": mod, "Núcleo": nuc, "Horário": hor, "Professor": prof, "Alunos": qtd}])
-                df_atual = pd.concat([df_turmas, nova], ignore_index=True)
-                conn.update(worksheet="turmas", data=df_atual)
-                st.success("✅ Turma salva com sucesso no Google Sheets!")
-                st.rerun()
+                if salvar_no_google_sheets("turmas", [cod, mod, nuc, hor, prof, qtd]):
+                    st.success("✅ Turma salva com sucesso na planilha!")
+                    st.rerun()
 
 # ---------------------------------------------------------
 # 3. AGENDA & CALENDÁRIO
@@ -149,11 +169,9 @@ elif menu == "📅 Agenda & Calendário":
             r_evt = st.text_input("Organização / Responsável:")
             
             if st.form_submit_button("💾 Incluir na Agenda Pública"):
-                nova_ag = pd.DataFrame([{"Data": str(d_evt), "Evento": n_evt, "Local": l_evt, "Responsável": r_evt}])
-                df_atual = pd.concat([df_agenda, nova_ag], ignore_index=True)
-                conn.update(worksheet="agenda", data=df_atual)
-                st.success("✅ Evento adicionado à agenda!")
-                st.rerun()
+                if salvar_no_google_sheets("agenda", [str(d_evt), n_evt, l_evt, r_evt]):
+                    st.success("✅ Evento adicionado à agenda!")
+                    st.rerun()
 
 # ---------------------------------------------------------
 # 4. ESPAÇOS ESPORTIVOS
@@ -176,11 +194,9 @@ elif menu == "🏟️ Espaços Esportivos":
             a_esp = col_b.selectbox("Acessível PcD:", ["Sim", "Parcial", "Não"])
             
             if st.form_submit_button("💾 Cadastrar Espaço"):
-                novo_e = pd.DataFrame([{"Nome": n_esp, "Tipo": t_esp, "Bairro": b_esp, "Condição": c_esp, "Última Vistoria": str(v_esp), "Acessível": a_esp}])
-                df_atual = pd.concat([df_espacos, novo_e], ignore_index=True)
-                conn.update(worksheet="espacos", data=df_atual)
-                st.success("✅ Espaço cadastrado no Google Sheets!")
-                st.rerun()
+                if salvar_no_google_sheets("espacos", [n_esp, t_esp, b_esp, c_esp, str(v_esp), a_esp]):
+                    st.success("✅ Espaço cadastrado com sucesso!")
+                    st.rerun()
 
 # ---------------------------------------------------------
 # 5. EQUIPE & PROFESSORES
@@ -200,11 +216,9 @@ elif menu == "👥 Equipe & Professores":
             ch_prof = st.text_input("Carga Horária (Ex: 40h/sem):")
             
             if st.form_submit_button("💾 Salvar Servidor"):
-                novo_p = pd.DataFrame([{"Nome": n_prof, "Cargo": c_prof, "Núcleo": nuc_prof, "Carga Horária": ch_prof}])
-                df_atual = pd.concat([df_equipe, novo_p], ignore_index=True)
-                conn.update(worksheet="equipe", data=df_atual)
-                st.success("✅ Servidor cadastrado!")
-                st.rerun()
+                if salvar_no_google_sheets("equipe", [n_prof, c_prof, nuc_prof, ch_prof]):
+                    st.success("✅ Servidor cadastrado!")
+                    st.rerun()
 
 # ---------------------------------------------------------
 # 6. ENTIDADES & ASSOCIAÇÕES
@@ -224,11 +238,9 @@ elif menu == "🏢 Entidades & Associações":
             ent_stat = st.selectbox("Status Cadastral:", ["Regular (Certificada)", "Em Análise", "Pendente de Documentação"])
             
             if st.form_submit_button("💾 Registrar Entidade"):
-                nova_ent = pd.DataFrame([{"Entidade": ent_nome, "CNPJ": ent_cnpj, "Presidente": ent_pres, "Status": ent_stat}])
-                df_atual = pd.concat([df_entidades, nova_ent], ignore_index=True)
-                conn.update(worksheet="entidades", data=df_atual)
-                st.success("✅ Entidade registrada!")
-                st.rerun()
+                if salvar_no_google_sheets("entidades", [ent_nome, ent_cnpj, ent_pres, ent_stat]):
+                    st.success("✅ Entidade registrada!")
+                    st.rerun()
 
 # ---------------------------------------------------------
 # 7. PROJETOS & PROGRAMAS
@@ -248,11 +260,9 @@ elif menu == "🚀 Projetos & Programas":
             p_exe = st.text_input("Percentual de Execução (Ex: 30%):")
             
             if st.form_submit_button("💾 Salvar Projeto"):
-                novo_proj = pd.DataFrame([{"Projeto": p_nome, "Orçamento": p_orc, "Beneficiários": p_ben, "Execução": p_exe}])
-                df_atual = pd.concat([df_projetos, novo_proj], ignore_index=True)
-                conn.update(worksheet="projetos", data=df_atual)
-                st.success("✅ Projeto adicionado!")
-                st.rerun()
+                if salvar_no_google_sheets("projetos", [p_nome, p_orc, p_ben, p_exe]):
+                    st.success("✅ Projeto adicionado!")
+                    st.rerun()
 
 # ---------------------------------------------------------
 # 8. FUNDO MUNICIPAL DO ESPORTE
@@ -272,11 +282,9 @@ elif menu == "💰 Fundo Municipal do Esporte":
             f_st = st.selectbox("Status:", ["Empenhado", "Em Execução", "Pago"])
             
             if st.form_submit_button("💾 Lançar no Fundo"):
-                novo_f = pd.DataFrame([{"Item": f_item, "Valor": f_val, "Fonte": f_fon, "Status": f_st}])
-                df_atual = pd.concat([df_fundo, novo_f], ignore_index=True)
-                conn.update(worksheet="fundo", data=df_atual)
-                st.success("✅ Lançamento financeiro registrado!")
-                st.rerun()
+                if salvar_no_google_sheets("fundo", [f_item, f_val, f_fon, f_st]):
+                    st.success("✅ Lançamento financeiro registrado!")
+                    st.rerun()
 
 # ---------------------------------------------------------
 # 9. PORTAL DA TRANSPARÊNCIA & NOTÍCIAS
@@ -293,11 +301,9 @@ elif menu == "📢 Portal da Transparência & Notícias":
             cont = st.text_area("Conteúdo da Mensagem:")
             
             if st.form_submit_button("🚀 Publicar no Portal"):
-                nova_pub = pd.DataFrame([{"Data": str(datetime.date.today()), "Título": tit, "Categoria": cat, "Conteúdo": cont}])
-                df_atual = pd.concat([nova_pub, df_noticias], ignore_index=True)
-                conn.update(worksheet="publicacoes", data=df_atual)
-                st.success("✅ Notícia publicada e salva na planilha!")
-                st.rerun()
+                if salvar_no_google_sheets("publicacoes", [str(datetime.date.today()), tit, cat, cont]):
+                    st.success("✅ Notícia publicada!")
+                    st.rerun()
         st.divider()
         
     st.subheader("📰 Publicações Ativas para a Sociedade")
@@ -306,3 +312,4 @@ elif menu == "📢 Portal da Transparência & Notícias":
             expander_label = f"📌 [{item['Data']}] {item['Título']} ({item['Categoria']})"
             with st.expander(expander_label):
                 st.write(item["Conteúdo"])
+    else:
