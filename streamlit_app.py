@@ -18,6 +18,7 @@ def salvar_no_google_sheets(nome_aba, lista_valores):
         }
         res = requests.post(URL_APPS_SCRIPT, json=payload)
         if res.status_code == 200:
+            st.cache_data.clear()  # Limpa o cache para recarregar a planilha atualizada
             return True
         else:
             st.error(f"⚠️ Erro ao gravar (Status {res.status_code})")
@@ -43,6 +44,7 @@ except Exception:
 
 def carregar_aba(nome_aba, colunas_padrao):
     try:
+        # ttl=0 garante leitura direta sem pegar versões antigas em cache
         df = conn.read(worksheet=nome_aba, ttl=0)
         if df.empty:
             return pd.DataFrame(columns=colunas_padrao)
@@ -82,6 +84,12 @@ else:
 
 st.sidebar.markdown("---")
 
+if st.sidebar.button("🔄 Atualizar Dados da Planilha"):
+    st.cache_data.clear()
+    st.rerun()
+
+st.sidebar.markdown("---")
+
 menu = st.sidebar.radio(
     "Módulos do Sistema:",
     [
@@ -109,10 +117,10 @@ if menu == "📊 Painel Executivo":
     df_fundo = carregar_aba("fundo", ["Item", "Valor", "Fonte", "Status"])
     df_projetos = carregar_aba("projetos", ["Projeto", "Orçamento", "Beneficiários", "Execução"])
 
-    total_alunos = int(pd.to_numeric(df_turmas["Alunos"], errors='coerce').sum()) if not df_turmas.empty else 0
+    total_alunos = int(pd.to_numeric(df_turmas["Alunos"], errors='coerce').sum()) if not df_turmas.empty and "Alunos" in df_turmas.columns else 0
     total_turmas = len(df_turmas)
     total_espacos = len(df_espacos)
-    total_fundo = float(pd.to_numeric(df_fundo["Valor"], errors='coerce').sum()) if not df_fundo.empty else 0.0
+    total_fundo = float(pd.to_numeric(df_fundo["Valor"], errors='coerce').sum()) if not df_fundo.empty and "Valor" in df_fundo.columns else 0.0
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total de Alunos", f"{total_alunos} Atendidos")
