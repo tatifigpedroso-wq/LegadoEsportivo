@@ -2,12 +2,32 @@ import streamlit as st
 import pandas as pd
 import datetime
 import requests
-from streamlit_gsheets import GSheetsConnection
 
 # ---------------------------------------------------------
-# CONFIGURAÇÃO DO APPS SCRIPT (GRAVAÇÃO DIRETA)
+# CONFIGURAÇÃO DO APPS SCRIPT (LEITURA E GRAVAÇÃO EM TEMPO REAL)
 # ---------------------------------------------------------
 URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbzso112s24zmUDyHAZFGlm8BNIBp2p-_PmYbbmtkdSKhMD3OCer3A3NxvOrPvyEg492/exec"
+
+def carregar_aba(nome_aba, colunas_padrao):
+    """Lê os dados da planilha em TEMPO REAL diretamente via Google Apps Script (sem cache do Google)."""
+    try:
+        res = requests.get(f"{URL_APPS_SCRIPT}?aba={nome_aba}", timeout=10)
+        if res.status_code == 200:
+            dados = res.json()
+            if not dados or len(dados) <= 1:
+                return pd.DataFrame(columns=colunas_padrao)
+            headers = [str(c).strip() for c in dados[0]]
+            rows = dados[1:]
+            df = pd.DataFrame(rows, columns=headers)
+            # Garante que todas as colunas padrão existam
+            for col in colunas_padrao:
+                if col not in df.columns:
+                    df[col] = ""
+            return df[colunas_padrao]
+        else:
+            return pd.DataFrame(columns=colunas_padrao)
+    except Exception:
+        return pd.DataFrame(columns=colunas_padrao)
 
 def salvar_no_google_sheets(nome_aba, lista_valores):
     """Envia os dados via POST para o Google Apps Script gravar na planilha."""
@@ -16,9 +36,9 @@ def salvar_no_google_sheets(nome_aba, lista_valores):
             "aba": nome_aba,
             "linha": lista_valores
         }
-        res = requests.post(URL_APPS_SCRIPT, json=payload)
+        res = requests.post(URL_APPS_SCRIPT, json=payload, timeout=10)
         if res.status_code == 200:
-            st.cache_data.clear()  # Limpa o cache para recarregar a planilha atualizada
+            st.cache_data.clear()
             return True
         else:
             st.error(f"⚠️ Erro ao gravar (Status {res.status_code})")
@@ -33,24 +53,6 @@ st.set_page_config(
     page_icon="⚽",
     layout="wide"
 )
-
-# ---------------------------------------------------------
-# CONEXÃO LEITURA COM O GOOGLE SHEETS
-# ---------------------------------------------------------
-try:
-    conn = st.connection("gsheets", type=GSheetsConnection)
-except Exception:
-    st.error("⚠️ Verifique a configuração de leitura nos Secrets.")
-
-def carregar_aba(nome_aba, colunas_padrao):
-    try:
-        # ttl=0 garante leitura direta sem pegar versões antigas em cache
-        df = conn.read(worksheet=nome_aba, ttl=0)
-        if df.empty:
-            return pd.DataFrame(columns=colunas_padrao)
-        return df
-    except Exception:
-        return pd.DataFrame(columns=colunas_padrao)
 
 # ---------------------------------------------------------
 # AUTENTICAÇÃO DE GESTOR
@@ -322,3 +324,4 @@ elif menu == "📢 Portal da Transparência & Notícias":
                 st.write(item["Conteúdo"])
     else:
         st.info("Nenhuma notícia publicada até o momento.")
+Clique no botão verde "Commit
