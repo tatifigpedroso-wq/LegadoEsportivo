@@ -19,7 +19,6 @@ def carregar_aba(nome_aba, colunas_padrao):
             headers = [str(c).strip() for c in dados[0]]
             rows = dados[1:]
             df = pd.DataFrame(rows, columns=headers)
-            # Garante que todas as colunas padrão existam
             for col in colunas_padrao:
                 if col not in df.columns:
                     df[col] = ""
@@ -324,4 +323,3 @@ elif menu == "📢 Portal da Transparência & Notícias":
                 st.write(item["Conteúdo"])
     else:
         st.info("Nenhuma notícia publicada até o momento.")
-Clique no botão verde "Commit
