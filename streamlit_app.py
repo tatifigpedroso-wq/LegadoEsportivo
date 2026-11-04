@@ -313,3 +313,4 @@ elif menu == "📢 Portal da Transparência & Notícias":
             with st.expander(expander_label):
                 st.write(item["Conteúdo"])
     else:
+        st.info("Nenhuma notícia publicada até o momento.")
