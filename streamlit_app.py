@@ -10,7 +10,7 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# AUTENTICAÇÃO E BASE DE DADOS EM MEMÓRIA DEDICADA
+# AUTENTICAÇÃO E BASE DE DADOS EM MEMÓRIA
 # ---------------------------------------------------------
 if "admin_logado" not in st.session_state:
     st.session_state.admin_logado = False
@@ -92,7 +92,7 @@ if not st.session_state.admin_logado:
         else:
             st.sidebar.error("❌ Senha incorreta.")
 else:
-    st.sidebar.success("🟢 Você está no Modo Gestão (Pode editar tudo na tela)")
+    st.sidebar.success("🟢 Modo Gestão Ativo")
     if st.sidebar.button("Sair do Modo Gestão"):
         st.session_state.admin_logado = False
         st.rerun()
@@ -115,16 +115,16 @@ menu = st.sidebar.radio(
 )
 
 # ---------------------------------------------------------
-# 1. PAINEL EXECUTIVO (CALCULADO AUTOMATICAMENTE)
+# 1. PAINEL EXECUTIVO
 # ---------------------------------------------------------
 if menu == "📊 Painel Executivo":
     st.title("📊 Painel Executivo — SMEL Toledo")
     st.caption("Resumo dinâmico da gestão municipal do esporte")
     
-    total_alunos = st.session_state.turmas["Alunos"].sum() if not st.session_state.turmas.empty else 0
+    total_alunos = int(st.session_state.turmas["Alunos"].sum()) if not st.session_state.turmas.empty else 0
     total_turmas = len(st.session_state.turmas)
     total_espacos = len(st.session_state.espacos)
-    total_fundo = st.session_state.fundo["Valor"].sum() if not st.session_state.fundo.empty else 0.0
+    total_fundo = float(st.session_state.fundo["Valor"].sum()) if not st.session_state.fundo.empty else 0.0
     
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total de Alunos", f"{total_alunos} Atendidos")
@@ -141,12 +141,11 @@ if menu == "📊 Painel Executivo":
 # ---------------------------------------------------------
 elif menu == "📋 Turmas & Escolinhas":
     st.title("📋 Turmas e Escolinhas Esportivas")
-    
     st.dataframe(st.session_state.turmas, use_container_width=True)
     
     if st.session_state.admin_logado:
         st.divider()
-        st.subheader("➕ Adicionar Nova Turma (Direto na Tela)")
+        st.subheader("➕ Adicionar Nova Turma")
         with st.form("form_turma", clear_on_submit=True):
             col1, col2, col3 = st.columns(3)
             cod = col1.text_input("Código da Turma (Ex: TUR-005):")
@@ -169,7 +168,6 @@ elif menu == "📋 Turmas & Escolinhas":
 # ---------------------------------------------------------
 elif menu == "📅 Agenda & Calendário":
     st.title("📅 Agenda & Calendário Esportivo")
-    
     st.dataframe(st.session_state.agenda, use_container_width=True)
     
     if st.session_state.admin_logado:
@@ -192,7 +190,6 @@ elif menu == "📅 Agenda & Calendário":
 # ---------------------------------------------------------
 elif menu == "🏟️ Espaços Esportivos":
     st.title("🏟️ Espaços Esportivos Municipais")
-    
     st.dataframe(st.session_state.espacos, use_container_width=True)
     
     if st.session_state.admin_logado:
@@ -218,7 +215,6 @@ elif menu == "🏟️ Espaços Esportivos":
 # ---------------------------------------------------------
 elif menu == "👥 Equipe & Professores":
     st.title("👥 Quadro de Servidores e Professores")
-    
     st.dataframe(st.session_state.equipe, use_container_width=True)
     
     if st.session_state.admin_logado:
@@ -241,7 +237,6 @@ elif menu == "👥 Equipe & Professores":
 # ---------------------------------------------------------
 elif menu == "🏢 Entidades & Associações":
     st.title("🏢 Entidades e Ligas Esportivas Parceiras")
-    
     st.dataframe(st.session_state.entidades, use_container_width=True)
     
     if st.session_state.admin_logado:
@@ -264,7 +259,6 @@ elif menu == "🏢 Entidades & Associações":
 # ---------------------------------------------------------
 elif menu == "🚀 Projetos & Programas":
     st.title("🚀 Projetos Estratégicos do Esporte")
-    
     st.dataframe(st.session_state.projetos, use_container_width=True)
     
     if st.session_state.admin_logado:
@@ -287,7 +281,6 @@ elif menu == "🚀 Projetos & Programas":
 # ---------------------------------------------------------
 elif menu == "💰 Fundo Municipal do Esporte":
     st.title("💰 Lançamentos do Fundo Municipal (FME)")
-    
     st.dataframe(st.session_state.fundo, use_container_width=True)
     
     if st.session_state.admin_logado:
@@ -326,4 +319,6 @@ elif menu == "📢 Portal da Transparência & Notícias":
         
     st.subheader("📰 Publicações Ativas para a Sociedade")
     for item in st.session_state.publicacoes:
-        with st.expander(f"📌 [{item['Data']}] {item['Título']} ({item['Categoria']})"):
+        expander_label = f"📌 [{item['Data']}] {item['Título']} ({item['Categoria']})"
+        with st.expander(expander_label):
+            st.write(item["Conteúdo"])
