@@ -128,7 +128,6 @@ st.sidebar.markdown("---")
 # MENU DINÂMICO BASEADO NO PERFIL DE ACESSO
 # ---------------------------------------------------------
 if st.session_state.admin_logado:
-    # Menu completo para Gestores
     opcoes_menu = [
         "📊 Painel Executivo & Metas",
         "🗺️ Mapa de Cobertura Territorial",
@@ -145,7 +144,6 @@ if st.session_state.admin_logado:
         "📢 Portal da Transparência & Notícias"
     ]
 else:
-    # Menu operacional e público (SEM dados financeiros e projetos)
     opcoes_menu = [
         "🗺️ Mapa de Cobertura Territorial",
         "📋 Turmas & Escolinhas",
@@ -160,7 +158,7 @@ else:
 
 menu = st.sidebar.radio("Navegação:", opcoes_menu)
 
-# Coordenadas aproximadas dos bairros/núcleos de Toledo (PR) para o Mapa
+# Coordenadas aproximadas de Toledo (PR) para o Mapa
 COORDENADAS_TOLEDO = {
     "Centro": [-24.7248, -53.7431],
     "Vila Nova": [-24.7150, -53.7320],
@@ -216,7 +214,6 @@ elif menu == "🗺️ Mapa de Cobertura Territorial":
     
     pontos_mapa = []
     
-    # 1. Adicionar espaços esportivos
     if not df_espacos.empty:
         for _, row in df_espacos.iterrows():
             bairro = str(row["Bairro"]).strip()
@@ -239,7 +236,6 @@ elif menu == "🗺️ Mapa de Cobertura Territorial":
                 "lon": coord[1] + (hash(nome + "lon") % 100) * 0.0001
             })
             
-    # 2. Adicionar turmas por núcleo
     if not df_turmas.empty:
         for _, row in df_turmas.iterrows():
             nucleo = str(row["Núcleo"]).strip()
@@ -269,11 +265,6 @@ elif menu == "🗺️ Mapa de Cobertura Territorial":
     else:
         st.info("Nenhum local ou turma com endereço mapeado até o momento. Cadastre turmas e espaços com seus respectivos bairros!")
 
-    st.markdown("""
-    💡 **Análise de Vazios Territoriais:** 
-    Regiões e bairros sem pontos no mapa indicam áreas prioritárias para a expansão de novas turmas ou instalação de núcleos esportivos comunitários.
-    """)
-
 # ---------------------------------------------------------
 # 3. TURMAS & ESCOLINHAS
 # ---------------------------------------------------------
@@ -286,7 +277,13 @@ elif menu == "📋 Turmas & Escolinhas":
     st.subheader("📄 Diário de Classe para Impressão")
     st.caption("Gere a folha de presença em papel para preenchimento em quadra/campo sem necessidade de celular pessoal.")
     if not df_turmas.empty:
-        turma_sel = st.selectbox("Selecione a Turma:", df_turmas["Código"] + " - " + df_turmas["Modalidade"] + " (" + df_turmas["Núcleo"] + ")")
+        # Conversão segura para string para evitar UFuncNoLoopError
+        opcoes_turmas = (
+            df_turmas["Código"].astype(str) + " - " + 
+            df_turmas["Modalidade"].astype(str) + " (" + 
+            df_turmas["Núcleo"].astype(str) + ")"
+        )
+        turma_sel = st.selectbox("Selecione a Turma:", opcoes_turmas)
         if st.button("🖨️ Visualizar Folha de Chamada Pronta"):
             st.markdown(f"""
             ### 🏛️ PREFEITURA DE TOLEDO - SMEL
