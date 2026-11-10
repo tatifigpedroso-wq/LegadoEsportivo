@@ -9,15 +9,16 @@ import json
 # ---------------------------------------------------------
 URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbzso112s24zmUDyHAZFGlm8BNIBp2p-_PmYbbmtkdSKhMD3OCer3A3NxvOrPvyEg492/exec"
 
+@st.cache_data(ttl=60)
 def carregar_aba(nome_aba, colunas_padrao):
-    """Lê os dados da planilha em TEMPO REAL diretamente via Google Apps Script (sem cache do Google)."""
+    """Lê os dados da planilha com cache inteligente de 60s para garantir navegação instantânea entre abas."""
     try:
         res = requests.get(f"{URL_APPS_SCRIPT}?aba={nome_aba}", timeout=10)
         if res.status_code == 200:
             dados = res.json()
             if not dados or len(dados) <= 1:
                 return pd.DataFrame(columns=colunas_padrao)
-            headers = [str(c).strip() for c in dados[0]]
+            headers = [str(c).strip() for c in dados]
             rows = dados[1:]
             df = pd.DataFrame(rows, columns=headers)
             for col in colunas_padrao:
@@ -38,7 +39,7 @@ def salvar_no_google_sheets(nome_aba, lista_valores):
         }
         res = requests.post(URL_APPS_SCRIPT, json=payload, timeout=10)
         if res.status_code == 200:
-            st.cache_data.clear()
+            st.cache_data.clear()  # Limpa o cache para que os dados novos apareçam no mesmo segundo
             return True
         else:
             st.error(f"⚠️ Erro ao gravar (Status {res.status_code})")
@@ -68,7 +69,7 @@ def obter_senha_gestor():
                     return val
     except Exception:
         pass
-    return "smel2026"  # Senha padrão inicial caso a aba config ainda não tenha registro
+    return "smel2026"  # Senha padrão inicial caso a aba config ainda não possua registro
 
 senha_atual_gestor = obter_senha_gestor()
 
@@ -232,8 +233,8 @@ elif menu == "🗺️ Mapa de Cobertura Territorial":
                 "Local": f"🏟️ {nome} ({tipo})",
                 "Bairro": bairro,
                 "Tipo": "Equipamento Esportivo",
-                "lat": coord[0] + (hash(nome) % 100) * 0.0001,
-                "lon": coord[1] + (hash(nome + "lon") % 100) * 0.0001
+                "lat": coord + (hash(nome) % 100) * 0.0001,
+                "lon": coord + (hash(nome + "lon") % 100) * 0.0001
             })
             
     if not df_turmas.empty:
@@ -253,8 +254,8 @@ elif menu == "🗺️ Mapa de Cobertura Territorial":
                 "Local": f"⚽ Turma de {mod}",
                 "Bairro": nucleo,
                 "Tipo": "Núcleo de Atendimento",
-                "lat": coord[0] + (hash(mod + nucleo) % 100) * 0.0001,
-                "lon": coord[1] + (hash(mod + nucleo + "lon") % 100) * 0.0001
+                "lat": coord + (hash(mod + nucleo) % 100) * 0.0001,
+                "lon": coord + (hash(mod + nucleo + "lon") % 100) * 0.0001
             })
 
     if pontos_mapa:
@@ -277,7 +278,6 @@ elif menu == "📋 Turmas & Escolinhas":
     st.subheader("📄 Diário de Classe para Impressão")
     st.caption("Gere a folha de presença em papel para preenchimento em quadra/campo sem necessidade de celular pessoal.")
     if not df_turmas.empty:
-        # Conversão segura para string para evitar UFuncNoLoopError
         opcoes_turmas = (
             df_turmas["Código"].astype(str) + " - " + 
             df_turmas["Modalidade"].astype(str) + " (" + 
